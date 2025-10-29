@@ -11,9 +11,9 @@
 		host?: string;
 		players?: string[];
 		createdAt?: Date | null;
-        game?: {
-            started?: boolean;
-        }
+		game?: {
+			started?: boolean;
+		};
 	} | null = null;
 
 	let loading = true;
@@ -39,7 +39,7 @@
 					host: d.host,
 					players: d.players ?? [],
 					createdAt: d.createdAt?.toDate?.() ?? null,
-                    game: d.game ?? null,
+					game: d.game ?? null
 				};
 				error = '';
 				loading = false;
@@ -61,7 +61,7 @@
 		starting = true;
 		try {
 			await startGameInFirestore(data.code);
-			goto(`/room/${data.code}/game`);
+			goto(`/room/${data.code}/game?nickname=${room?.host}`);
 		} catch (err) {
 			console.error(err);
 			error = (err as Error)?.message ?? 'Failed to start game';
@@ -70,10 +70,14 @@
 		}
 	}
 
-    function onJoinGame() {
-        // navigate to the game page — disabled in UI unless game started
-        goto(`/room/${data.code}/game`);
-    }
+	function onJoinGame() {
+		// navigate to the game page — disabled in UI unless game started
+
+		const playerNickname = room?.players?.find((p) => p !== room?.host);
+		if (playerNickname) {
+			goto(`/room/${data.code}/game?nickname=${playerNickname}`);
+		}
+	}
 
 	const goHome = () => goto('/');
 </script>
@@ -142,14 +146,14 @@
 					{starting ? 'Starting...' : 'Start Game'}
 				</button>
 
-                <button
-                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
-                    on:click={onJoinGame}
-                    disabled={loading || !room?.game?.started}
-                    title={room?.game?.started ? 'Join the game' : 'Waiting for host to start the game'}
-                >
-                    Join Game
-                </button>
+				<button
+					class="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
+					on:click={onJoinGame}
+					disabled={loading || !room?.game?.started}
+					title={room?.game?.started ? 'Join the game' : 'Waiting for host to start the game'}
+				>
+					Join Game
+				</button>
 
 				<button class="rounded-lg bg-red-100 px-4 py-2 text-red-700" on:click={goHome}>
 					Leave
