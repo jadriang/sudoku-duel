@@ -36,5 +36,9 @@
 		"typescript": "^5.9.2",
 		"typescript-eslint": "^8.44.1",
 		"vite": "^7.1.7"
+	},
+	"dependencies": {
+		"firebase": "^12.4.0",
+		"sudoku-gen": "^1.0.2"
 	}
 }
