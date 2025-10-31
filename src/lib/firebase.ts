@@ -17,6 +17,7 @@ import {
 
 import { PUBLIC_FIREBASE_API_KEY, PUBLIC_FIREBASE_AUTH_DOMAIN, PUBLIC_FIREBASE_PROJECT_ID, PUBLIC_FIREBASE_STORAGE_BUCKET, PUBLIC_FIREBASE_MESSAGING_SENDER_ID, PUBLIC_FIREBASE_APP_ID } from '$env/static/public';
 import { getSudoku } from 'sudoku-gen';
+import { GAME_CONFIG } from './config';
 
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'expert';
 
@@ -87,7 +88,7 @@ export async function createRoomInFirestore(hostNickname: string): Promise<strin
         players: {
             [hostNickname]: {
                 nickname: hostNickname,
-                lives: 3,
+                lives: GAME_CONFIG.maxLives,
                 isCurrentPlayer: true,
                 joinedAt: serverTimestamp()
             }
@@ -99,7 +100,6 @@ export async function createRoomInFirestore(hostNickname: string): Promise<strin
         }
     });
 
-    // Store the room code (doc ID) in the document itself
     await updateDoc(roomDoc, {
         code: roomDoc.id
     });
@@ -130,7 +130,7 @@ export async function joinRoomInFirestore(roomCode: string, nickname: string): P
     await updateDoc(roomRef, {
         [`players.${nickname}`]: {
             nickname,
-            lives: 3,
+            lives: GAME_CONFIG.maxLives,
             isCurrentPlayer: false,
             joinedAt: serverTimestamp()
         },
@@ -160,11 +160,11 @@ export async function startGameInFirestore(roomCode: string, difficulty: Difficu
     const solutionStr = s.solution;
 
     // Initialize player states
-    const playerStates: { [nickname: string]: Player } = {};
+     const playerStates: { [nickname: string]: Player } = {};
     Object.keys(data.players).forEach(nickname => {
         playerStates[nickname] = {
             ...data.players[nickname],
-            lives: 3,
+            lives: GAME_CONFIG.maxLives,
             isCurrentPlayer: nickname === data.host
         };
     });
