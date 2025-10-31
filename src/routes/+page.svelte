@@ -16,7 +16,9 @@
         error = '';
 
         try {
-            const roomId = await createRoomInFirestore(nickname);
+            // Store nickname in sessionStorage
+            sessionStorage.setItem('sudoku_nickname', nickname.trim());
+            const roomId = await createRoomInFirestore(nickname.trim());
             goto(`/room/${roomId}`);
         } catch (err) {
             console.error(err);
@@ -36,7 +38,9 @@
 
         try {
             const code = roomCode.trim();
-            await joinRoomInFirestore(code, nickname);
+            // Store nickname in sessionStorage
+            sessionStorage.setItem('sudoku_nickname', nickname.trim());
+            await joinRoomInFirestore(code, nickname.trim());
             goto(`/room/${code}`);
         } catch (err) {
             console.error(err);
@@ -57,6 +61,7 @@
             bind:value={nickname}
             class="w-full border rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Enter nickname"
+            maxlength="20"
         />
 
         <!-- Create Room -->
