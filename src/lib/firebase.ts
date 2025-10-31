@@ -5,12 +5,10 @@ import { initializeApp } from "firebase/app";
 
 import {
     getFirestore,
-    collection,
     doc,
     setDoc,
     getDoc,
     updateDoc,
-    arrayUnion,
     serverTimestamp
 } from 'firebase/firestore';
 
@@ -18,6 +16,7 @@ import { PUBLIC_FIREBASE_API_KEY, PUBLIC_FIREBASE_AUTH_DOMAIN, PUBLIC_FIREBASE_P
 import { getSudoku } from 'sudoku-gen';
 
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'expert';
+
 export interface Player {
     nickname: string;
     lives: number;
@@ -58,15 +57,19 @@ export const db = getFirestore(app);
 export async function createRoomInFirestore(hostNickname: string): Promise<string> {
     if (!hostNickname || !hostNickname.trim()) throw new Error('Invalid host nickname');
 
-    const roomsCol = collection(db, 'rooms');
-    // create a new doc ref with an auto id
-    const roomRef = doc(roomsCol);
+    const roomRef = doc(db, 'rooms');
     const roomId = roomRef.id;
 
     await setDoc(roomRef, {
         code: roomId,
         host: hostNickname,
-        players: [hostNickname],
+        players: {
+            [hostNickname]: {
+                nickname: hostNickname,
+                lives: 3,
+                isCurrentPlayer: true,
+            }
+        },
         createdAt: serverTimestamp()
     });
 
@@ -89,7 +92,11 @@ export async function joinRoomInFirestore(roomCode: string, nickname: string): P
     }
 
     await updateDoc(roomRef, {
-        players: arrayUnion(nickname)
+        [nickname]: {
+            nickname,
+            lives: 3,
+            isCurrentPlayer: false
+        }
     });
 
     return roomCode;
