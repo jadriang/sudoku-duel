@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onDestroy, onMount } from 'svelte';
     import { doc, onSnapshot } from 'firebase/firestore';
-    import { db, startGameInFirestore } from '$lib/firebase';
+    import { db, startGameInFirestore, onAuthChange, getUserProfile, type UserProfile } from '$lib/firebase';
     import { goto } from '$app/navigation';
     import { COLORS, GAME_CONFIG } from '$lib/config';
 
@@ -10,7 +10,7 @@
     let room: {
         code: string;
         host?: string;
-        players?: { [nickname: string]: any };
+        players?: { [uid: string]: any };
         createdAt?: Date | null;
         game?: {
             started?: boolean;
@@ -20,10 +20,23 @@
     let loading = true;
     let error = '';
     let unsub: (() => void) | null = null;
-    let myNickname = '';
+    let user: any = null;
+    let userProfile: UserProfile | null = null;
 
     onMount(() => {
-        myNickname = sessionStorage.getItem('sudoku_nickname') || '';
+        const unsubAuth = onAuthChange(async (authUser) => {
+            user = authUser;
+            if (authUser) {
+                userProfile = await getUserProfile(authUser.uid);
+                if (!userProfile) {
+                    goto('/auth');
+                    return;
+                }
+            } else {
+                goto('/auth');
+                return;
+            }
+        });
         
         loading = true;
         const roomRef = doc(db, 'rooms', data.code);
@@ -54,6 +67,11 @@
                 loading = false;
             }
         );
+
+        return () => {
+            if (unsub) unsub();
+            unsubAuth();
+        };
     });
 
     onDestroy(() => {
@@ -62,10 +80,12 @@
 
     let starting = false;
     async function onStartGame() {
+        if (!user) return;
+        
         starting = true;
         try {
             await startGameInFirestore(data.code);
-            goto(`/room/${data.code}/game?nickname=${encodeURIComponent(myNickname || room?.host || '')}`);
+            goto(`/room/${data.code}/game`);
         } catch (err) {
             console.error(err);
             error = (err as Error)?.message ?? 'Failed to start game';
@@ -75,10 +95,10 @@
     }
 
     function onJoinGame() {
-        if (myNickname) {
-            goto(`/room/${data.code}/game?nickname=${encodeURIComponent(myNickname)}`);
+        if (user) {
+            goto(`/room/${data.code}/game`);
         } else {
-            error = 'Nickname not found. Please rejoin the room.';
+            error = 'You must be logged in';
         }
     }
 
@@ -86,6 +106,7 @@
 
     $: playersList = room?.players ? Object.values(room.players) : [];
     $: playerCount = playersList.length;
+    $: isHost = user && room?.host === user.uid;
 </script>
 
 <style>
@@ -154,7 +175,7 @@
                                 <span class="text-xl sm:text-2xl">🎯</span>
                                 <span class="retro-text text-[10px] sm:text-xs break-all" style="color: {COLORS.primary}">{player.nickname}</span>
                             </div>
-                            {#if player.nickname === room.host}
+                            {#if player.uid === room.host}
                                 <span class="retro-box px-2 py-1 self-start sm:self-center" style="background-color: {COLORS.primary}; color: {COLORS.secondary}">
                                     <span class="retro-text text-[8px] sm:text-[10px]">👑 HOST</span>
                                 </span>
@@ -174,23 +195,25 @@
 
             <!-- Action Buttons -->
             <div class="flex flex-col gap-3 sm:gap-4">
-                <button
-                    class="retro-button hover:opacity-90 py-3 sm:py-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                    style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
-                    on:click={onStartGame}
-                    disabled={starting || room.game?.started || !myNickname || playerCount < GAME_CONFIG.minPlayers}
-                >
-                    <span class="text-[10px] sm:text-xs">
-                        {starting ? '⏳ STARTING...' : room.game?.started ? '✓ STARTED' : '🚀 START GAME'}
-                    </span>
-                </button>
+                {#if isHost}
+                    <button
+                        class="retro-button hover:opacity-90 py-3 sm:py-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                        style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
+                        on:click={onStartGame}
+                        disabled={starting || room.game?.started || playerCount < GAME_CONFIG.minPlayers}
+                    >
+                        <span class="text-[10px] sm:text-xs">
+                            {starting ? '⏳ STARTING...' : room.game?.started ? '✓ STARTED' : '🚀 START GAME'}
+                        </span>
+                    </button>
+                {/if}
 
                 {#if room.game?.started}
                     <button
                         class="retro-button hover:opacity-90 py-3 sm:py-4 disabled:opacity-50"
                         style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
                         on:click={onJoinGame}
-                        disabled={!myNickname}
+                        disabled={!user}
                     >
                         <span class="text-[10px] sm:text-xs">🎯 JOIN GAME</span>
                     </button>

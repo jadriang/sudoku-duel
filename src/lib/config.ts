@@ -1,6 +1,6 @@
 export const COLORS = {
-    primary: '#134686',   // Deep blue
-    secondary: '#FFB347'  // Peach/orange
+    primary: '#3B7A57',   // Deep blue
+    secondary: '#FFD447'  // Peach/orange
 };
 
 export const GAME_CONFIG = {

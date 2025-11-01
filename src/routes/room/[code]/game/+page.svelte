@@ -1,16 +1,16 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
     import { doc, onSnapshot, collection, query, orderBy } from 'firebase/firestore';
-    import { db, type GameState, type Move } from '$lib/firebase';
+    import { db, type GameState, type Move, onAuthChange, getUserProfile, type UserProfile } from '$lib/firebase';
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
-    import { browser } from '$app/environment';
     import { writeBatch, getDoc, getDocs, serverTimestamp } from 'firebase/firestore';
     import { COLORS, GAME_CONFIG } from '$lib/config';
 
-    let nickname = '';
     const code = $page.params.code;
 
+    let user: any = null;
+    let userProfile: UserProfile | null = null;
     let room: { 
         game?: GameState; 
         host?: string;
@@ -23,7 +23,7 @@
     let lastMoveResult: boolean | null = null;
     let flashingCell: number | null = null;
 
-    async function makeMove(roomCode: string, nickname: string, position: number): Promise<boolean> {
+    async function makeMove(roomCode: string, uid: string, position: number): Promise<boolean> {
         const roomRef = doc(db, 'rooms', roomCode);
         const batch = writeBatch(db);
 
@@ -34,7 +34,7 @@
         const game = data.game as GameState;
 
         if (!game?.started) throw new Error('Game not started');
-        if (!game.players[nickname]?.isCurrentPlayer) throw new Error('Not your turn');
+        if (!game.players[uid]?.isCurrentPlayer) throw new Error('Not your turn');
         if (game.board[position] !== '.') throw new Error('Cell already filled');
 
         const isCorrect = String(game.solution[position]) === String(game.currentNumber);
@@ -46,24 +46,24 @@
 
         const updatedPlayers = { ...game.players };
         if (!isCorrect) {
-            updatedPlayers[nickname].lives -= 1;
+            updatedPlayers[uid].lives -= 1;
         }
 
-        const playerNicks = Object.keys(updatedPlayers);
-        const currentIdx = playerNicks.indexOf(nickname);
-        const nextPlayer = playerNicks[(currentIdx + 1) % playerNicks.length];
+        const playerUids = Object.keys(updatedPlayers);
+        const currentIdx = playerUids.indexOf(uid);
+        const nextPlayer = playerUids[(currentIdx + 1) % playerUids.length];
 
         const nextNumber = Math.floor(Math.random() * 9) + 1;
 
-        Object.keys(updatedPlayers).forEach(nick => {
-            updatedPlayers[nick].isCurrentPlayer = nick === nextPlayer;
+        Object.keys(updatedPlayers).forEach(playerUid => {
+            updatedPlayers[playerUid].isCurrentPlayer = playerUid === nextPlayer;
         });
 
         const moveCount = (await getDocs(collection(db, 'rooms', roomCode, 'moves'))).size;
         const moveRef = doc(collection(db, 'rooms', roomCode, 'moves'));
         batch.set(moveRef, {
             moveNumber: moveCount + 1,
-            player: nickname,
+            player: updatedPlayers[uid].nickname,
             position,
             numberPlaced: game.currentNumber,
             isValid: isCorrect,
@@ -77,9 +77,9 @@
                 board: newBoard.join(''),
                 players: updatedPlayers,
                 currentNumber: nextNumber,
-                lastMoveBy: nickname,
-                winner: updatedPlayers[nickname].lives <= 0 ? nextPlayer : null,
-                status: updatedPlayers[nickname].lives <= 0 ? 'finished' : 'active'
+                lastMoveBy: updatedPlayers[uid].nickname,
+                winner: updatedPlayers[uid].lives <= 0 ? updatedPlayers[nextPlayer].nickname : null,
+                status: updatedPlayers[uid].lives <= 0 ? 'finished' : 'active'
             },
             updatedAt: serverTimestamp()
         });
@@ -89,13 +89,22 @@
     }
 
     onMount(() => {
-        nickname = $page.url.searchParams.get('nickname') || '';
-        if (!nickname && browser) {
-            nickname = sessionStorage.getItem('sudoku_nickname') || '';
-        }
+        const unsubAuth = onAuthChange(async (authUser) => {
+            user = authUser;
+            if (authUser) {
+                userProfile = await getUserProfile(authUser.uid);
+                if (!userProfile) {
+                    goto('/auth');
+                    return;
+                }
+            } else {
+                goto('/auth');
+                return;
+            }
+        });
 
-        if (!code || !nickname) {
-            error = 'Missing room code or nickname';
+        if (!code) {
+            error = 'Missing room code';
             loading = false;
             return;
         }
@@ -129,7 +138,7 @@
             (err) => console.error('Failed to load moves:', err)
         );
 
-        unsub = [unsubRoom, unsubMoves];
+        unsub = [unsubRoom, unsubMoves, unsubAuth];
     });
 
     onDestroy(() => {
@@ -156,17 +165,17 @@
     }
 
     async function handleCellClick(position: number) {
-        if (!room?.game || !nickname) return;
+        if (!room?.game || !user) return;
         
         const game = room.game;
-        const player = game.players[nickname];
+        const player = game.players[user.uid];
         
         if (!player?.isCurrentPlayer) return;
         if (game.board[position] !== '.') return;
         
         try {
             flashingCell = position;
-            const result = await makeMove(code as string, nickname, position);
+            const result = await makeMove(code as string, user.uid, position);
             lastMoveResult = result;
             
             setTimeout(() => {
@@ -186,9 +195,9 @@
         return date.toLocaleTimeString();
     }
 
-    $: isMyTurn = room?.game?.players[nickname]?.isCurrentPlayer ?? false;
+    $: isMyTurn = (user && room?.game?.players[user.uid]?.isCurrentPlayer) ?? false;
     $: currentNumber = room?.game?.currentNumber;
-    $: myLives = room?.game?.players[nickname]?.lives ?? GAME_CONFIG.maxLives;
+    $: myLives = (user && room?.game?.players[user.uid]?.lives) ?? GAME_CONFIG.maxLives;
     $: winner = room?.game?.winner;
     $: gameOver = room?.status === 'finished' || winner !== null;
     $: playersList = room?.game?.players ? Object.values(room.game.players) : [];
