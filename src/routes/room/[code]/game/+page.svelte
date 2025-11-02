@@ -23,6 +23,23 @@
     let lastMoveResult: boolean | null = null;
     let flashingCell: number | null = null;
 
+    // Helper function to get available numbers that can still be played
+    function getAvailableNumbers(board: string, solution: string): number[] {
+        const available: Set<number> = new Set();
+        
+        // Check each empty cell to see what numbers can be played
+        for (let i = 0; i < board.length; i++) {
+            if (board[i] === '.') {
+                const solutionNumber = parseInt(solution[i]);
+                if (!isNaN(solutionNumber)) {
+                    available.add(solutionNumber);
+                }
+            }
+        }
+        
+        return Array.from(available).sort();
+    }
+
     async function makeMove(roomCode: string, uid: string, position: number): Promise<boolean> {
         const roomRef = doc(db, 'rooms', roomCode);
         const batch = writeBatch(db);
@@ -53,7 +70,45 @@
         const currentIdx = playerUids.indexOf(uid);
         const nextPlayer = playerUids[(currentIdx + 1) % playerUids.length];
 
-        const nextNumber = Math.floor(Math.random() * 9) + 1;
+        const boardAfterMove = newBoard.join('');
+        const availableNumbers = getAvailableNumbers(boardAfterMove, game.solution);
+        
+        let nextNumber: number;
+        
+        if (availableNumbers.length === 0) {
+            // Game is complete! Someone wins
+            const otherPlayer = playerUids.find(id => id !== uid);
+            batch.update(roomRef, {
+                game: {
+                    ...game,
+                    board: boardAfterMove,
+                    players: updatedPlayers,
+                    lastMoveBy: updatedPlayers[uid].nickname,
+                    winner: otherPlayer ? updatedPlayers[otherPlayer].nickname : updatedPlayers[uid].nickname,
+                    status: 'finished'
+                },
+                status: 'finished',
+                updatedAt: serverTimestamp()
+            });
+
+            const moveCount = (await getDocs(collection(db, 'rooms', roomCode, 'moves'))).size;
+            const moveRef = doc(collection(db, 'rooms', roomCode, 'moves'));
+            batch.set(moveRef, {
+                moveNumber: moveCount + 1,
+                player: updatedPlayers[uid].nickname,
+                position,
+                numberPlaced: game.currentNumber,
+                isValid: isCorrect,
+                timestamp: serverTimestamp(),
+                chosenNextNumber: null
+            } as Move);
+
+            await batch.commit();
+            return isCorrect;
+        }
+        
+        // Select a random number from available numbers
+        nextNumber = availableNumbers[Math.floor(Math.random() * availableNumbers.length)];
 
         Object.keys(updatedPlayers).forEach(playerUid => {
             updatedPlayers[playerUid].isCurrentPlayer = playerUid === nextPlayer;
@@ -71,16 +126,21 @@
             chosenNextNumber: nextNumber
         } as Move);
 
+        // Check if current player lost all lives
+        const gameStatus = updatedPlayers[uid].lives <= 0 ? 'finished' : 'active';
+        const winner = updatedPlayers[uid].lives <= 0 ? updatedPlayers[nextPlayer].nickname : null;
+
         batch.update(roomRef, {
             game: {
                 ...game,
-                board: newBoard.join(''),
+                board: boardAfterMove,
                 players: updatedPlayers,
                 currentNumber: nextNumber,
                 lastMoveBy: updatedPlayers[uid].nickname,
-                winner: updatedPlayers[uid].lives <= 0 ? updatedPlayers[nextPlayer].nickname : null,
-                status: updatedPlayers[uid].lives <= 0 ? 'finished' : 'active'
+                winner: winner,
+                status: gameStatus
             },
+            status: gameStatus,
             updatedAt: serverTimestamp()
         });
 
@@ -150,16 +210,16 @@
     function borderClasses(r: number, c: number) {
         const borders = [];
         if (r % 3 === 0) borders.push('border-t-4');
-        else borders.push('border-t-2');
+        else borders.push('border-t');
         
         if (c % 3 === 0) borders.push('border-l-4');
-        else borders.push('border-l-2');
+        else borders.push('border-l');
         
         if (c === 8) borders.push('border-r-4');
-        else borders.push('border-r-2');
+        else borders.push('border-r');
         
         if (r === 8) borders.push('border-b-4');
-        else borders.push('border-b-2');
+        else borders.push('border-b');
         
         return borders.join(' ') + ' border-black';
     }
@@ -248,6 +308,16 @@
     .shake {
         animation: shake 0.3s ease-in-out;
     }
+
+    .board-number {
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        line-height: 1;
+        /* remove retro text shadow for better legibility on numbers */
+        text-shadow: none;
+    }
+
 </style>
 
 <div class="min-h-screen flex items-center justify-center p-2 sm:p-4" style="background-color: {COLORS.primary}">
@@ -255,9 +325,9 @@
         <!-- Header -->
         <div class="flex justify-between items-center mb-4 sm:mb-6">
             <h2 class="retro-text text-[10px] sm:text-sm md:text-lg" style="color: {COLORS.primary}">🎮 GAME</h2>
-            <button on:click={goBack} class="retro-button hover:opacity-90 px-2 py-1 sm:px-3 sm:py-2" style="background-color: {COLORS.primary}; color: {COLORS.secondary}">
-                <span class="text-[10px] sm:text-xs">❌</span>
-            </button>
+                <button on:click={goBack} class="retro-button hover:opacity-90 px-2 py-1 sm:px-3 sm:py-2" style="background-color: {COLORS.primary}; color: {COLORS.secondary}">
+                    <span class="text-[10px] sm:text-xs">❌</span>
+                </button>
         </div>
 
         {#if loading}
@@ -353,7 +423,7 @@
                                         style="background-color: {isPuzzleNumber ? COLORS.secondary : 'white'}; {isMyTurn && !isPuzzleNumber && !gameOver ? `hover:background-color: ${COLORS.secondary}` : ''}"
                                         on:click={() => !isPuzzleNumber && !gameOver && handleCellClick(position)}
                                     >
-                                        <span class="retro-text text-sm sm:text-base md:text-xl" style="color: {COLORS.primary}">
+                                        <span class="retro-text board-number text-sm sm:text-base md:text-xl" style="color: {COLORS.primary}">
                                             {value !== '.' ? value : ''}
                                         </span>
                                     </div>
