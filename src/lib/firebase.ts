@@ -177,11 +177,13 @@ export async function createRoomInFirestore(hostUid: string, hostNickname: strin
     if (!hostUid?.trim() || !hostNickname?.trim()) throw new Error('Invalid host data');
 
     const roomsCol = collection(db, 'rooms');
+    const ttlDate = new Date(Date.now() + 2 * 60 * 60 * 1000);
     const roomDoc = await addDoc(roomsCol, {
         host: hostUid,
         status: 'waiting',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        expireAt: ttlDate,
         players: {
             [hostUid]: {
                 uid: hostUid,
@@ -326,7 +328,7 @@ export async function makeMove(
 
     // Random number for next player
     const nextNumber = Math.floor(Math.random() * 9) + 1;
-
+      const ttlDate = new Date(Date.now() + 2 * 60 * 60 * 1000);
     // Record move in subcollection
     const moveRef = doc(collection(db, 'rooms', roomCode, 'moves'));
     batch.set(moveRef, {
@@ -336,7 +338,8 @@ export async function makeMove(
         numberPlaced: game.currentNumber,
         isValid: isCorrect,
         timestamp: serverTimestamp(),
-        chosenNextNumber: nextNumber
+        chosenNextNumber: nextNumber,
+        expireAt: ttlDate
     } as Move);
 
     // Update game state

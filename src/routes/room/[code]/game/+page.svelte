@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import { doc, onSnapshot, collection, query, orderBy } from 'firebase/firestore';
+    import { doc, onSnapshot, collection, query, orderBy, increment } from 'firebase/firestore';
     import { db, type GameState, type Move, onAuthChange, getUserProfile, type UserProfile } from '$lib/firebase';
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
@@ -22,6 +22,9 @@
     let error = '';
     let lastMoveResult: boolean | null = null;
     let flashingCell: number | null = null;
+
+    let lastSeenMoveNumber = 0;
+    let tempNumbers: Record<number, string> = {};
 
     // Helper function to get available numbers that can still be played
     function getAvailableNumbers(board: string, solution: string): number[] {
@@ -74,17 +77,21 @@
         const availableNumbers = getAvailableNumbers(boardAfterMove, game.solution);
         
         let nextNumber: number;
+        const ttlDate = new Date(Date.now() + 2 * 60 * 60 * 1000); 
         
         if (availableNumbers.length === 0) {
             // Game is complete! Someone wins
             const otherPlayer = playerUids.find(id => id !== uid);
+            const winnerUid = otherPlayer ? otherPlayer : uid;
+            const winnerNickname = winnerUid ? updatedPlayers[winnerUid].nickname : updatedPlayers[uid].nickname;
+            
             batch.update(roomRef, {
                 game: {
                     ...game,
                     board: boardAfterMove,
                     players: updatedPlayers,
                     lastMoveBy: updatedPlayers[uid].nickname,
-                    winner: otherPlayer ? updatedPlayers[otherPlayer].nickname : updatedPlayers[uid].nickname,
+                    winner: winnerNickname,
                     status: 'finished'
                 },
                 status: 'finished',
@@ -100,8 +107,15 @@
                 numberPlaced: game.currentNumber,
                 isValid: isCorrect,
                 timestamp: serverTimestamp(),
-                chosenNextNumber: null
+                chosenNextNumber: null,
+                expireAt: ttlDate
             } as Move);
+
+            for (const puid of playerUids) {
+                const userRef = doc(db, 'users', puid);
+                batch.set(userRef, { gamesPlayed: increment(1) }, { merge: true });
+            }
+            batch.set(doc(db, 'users', winnerUid), { gamesWon: increment(1) }, { merge: true });
 
             await batch.commit();
             return isCorrect;
@@ -123,7 +137,8 @@
             numberPlaced: game.currentNumber,
             isValid: isCorrect,
             timestamp: serverTimestamp(),
-            chosenNextNumber: nextNumber
+            chosenNextNumber: nextNumber,
+            expireAt: ttlDate
         } as Move);
 
         // Check if current player lost all lives
@@ -194,6 +209,31 @@
             movesQuery,
             (snapshot) => {
                 moves = snapshot.docs.map(doc => doc.data() as Move);
+
+
+                if (snapshot.docs.length > 0) {
+                    const latest = snapshot.docs[0].data() as Move;
+                    const mvNumber = latest.moveNumber || 0;
+
+                    if (mvNumber > lastSeenMoveNumber) {
+                        lastSeenMoveNumber = mvNumber;
+
+                        const myNickname = room?.game?.players?.[user?.uid]?.nickname;
+                        if (!myNickname || latest.player !== myNickname) {
+                            flashingCell = latest.position;
+                            lastMoveResult = latest.isValid ?? null;
+                            if (latest.numberPlaced != null) {
+                                tempNumbers[latest.position] = String(latest.numberPlaced);
+                            }
+
+                            setTimeout(() => {
+                                delete tempNumbers[latest.position];
+                                flashingCell = null;
+                                lastMoveResult = null;
+                            }, 2000);
+                        }
+                    }
+                }
             },
             (err) => console.error('Failed to load moves:', err)
         );
@@ -424,7 +464,8 @@
                                         on:click={() => !isPuzzleNumber && !gameOver && handleCellClick(position)}
                                     >
                                         <span class="retro-text board-number text-sm sm:text-base md:text-xl" style="color: {COLORS.primary}">
-                                            {value !== '.' ? value : ''}
+                                            <!-- {value !== '.' ? value : ''} -->
+                                            {tempNumbers[position] ?? (value !== '.' ? value : '')}
                                         </span>
                                     </div>
                                 {/each}
