@@ -167,6 +167,12 @@
         const unsubAuth = onAuthChange(async (authUser) => {
             user = authUser;
             if (authUser) {
+                // require email verification
+                if (!authUser.emailVerified) {
+                    goto('/auth');
+                    return;
+                }
+
                 userProfile = await getUserProfile(authUser.uid);
                 if (!userProfile) {
                     goto('/auth');

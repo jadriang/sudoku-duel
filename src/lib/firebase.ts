@@ -11,6 +11,9 @@ import {
     serverTimestamp,
     getDocs,
     collection,
+    query,
+    where,
+    increment,
     writeBatch,
     addDoc,
     setDoc
@@ -21,6 +24,7 @@ import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signOut as firebaseSignOut,
+    sendEmailVerification,
     onAuthStateChanged,
     type User
 } from 'firebase/auth';
@@ -119,7 +123,14 @@ export async function signUp(email: string, password: string, nickname: string):
         gamesWon: 0
     } as UserProfile);
 
-    // Wait a bit to ensure Firestore write is complete
+    // Send verification email - user must verify before full access
+    try {
+        await sendEmailVerification(user);
+    } catch (e) {
+        console.warn('Failed to send verification email', e);
+    }
+
+    // Wait briefly to ensure Firestore write is visible
     await new Promise(resolve => setTimeout(resolve, 500));
 
     return user;
@@ -176,7 +187,28 @@ export function onAuthChange(callback: (user: User | null) => void) {
 export async function createRoomInFirestore(hostUid: string, hostNickname: string): Promise<string> {
     if (!hostUid?.trim() || !hostNickname?.trim()) throw new Error('Invalid host data');
 
+    // Enforce per-user active room limit (max 5 active games)
     const roomsCol = collection(db, 'rooms');
+    const q = query(roomsCol, where('host', '==', hostUid));
+    const existing = await getDocs(q);
+    const now = new Date();
+    const activeCount = existing.docs.filter(d => {
+        const data = d.data();
+        // count rooms that are not finished and not expired
+        const status = data.status;
+        const expireAt = data.expireAt;
+        const notFinished = status !== 'finished';
+        let notExpired = true;
+        if (expireAt) {
+            try { notExpired = expireAt.toDate ? expireAt.toDate() > now : new Date(expireAt) > now; } catch(e) { notExpired = true; }
+        }
+        return notFinished && notExpired;
+    }).length;
+
+    if (activeCount >= 5) {
+        throw new Error('You already have 5 active games. Close or wait for one to expire before creating another.');
+    }
+
     const ttlDate = new Date(Date.now() + 2 * 60 * 60 * 1000);
     const roomDoc = await addDoc(roomsCol, {
         host: hostUid,
@@ -228,6 +260,12 @@ export async function joinRoomInFirestore(roomCode: string, uid: string, nicknam
         throw new Error('You are already in this room');
     }
 
+    // Prevent joining if room already has maxPlayers
+    const currentPlayers = data.players ? Object.keys(data.players).length : 0;
+    if (currentPlayers >= GAME_CONFIG.maxPlayers) {
+        throw new Error('Room is full');
+    }
+
     await updateDoc(roomRef, {
         [`players.${uid}`]: {
             uid,
@@ -263,6 +301,10 @@ export async function startGameInFirestore(roomCode: string, difficulty: Difficu
 
     // Initialize player states
      const playerStates: { [uid: string]: Player } = {};
+    const playerUids = Object.keys(data.players || {});
+    if (playerUids.length < GAME_CONFIG.minPlayers) throw new Error(`Need at least ${GAME_CONFIG.minPlayers} players to start`);
+    if (playerUids.length > GAME_CONFIG.maxPlayers) throw new Error(`Too many players (max ${GAME_CONFIG.maxPlayers})`);
+
     Object.keys(data.players).forEach(uid => {
         playerStates[uid] = {
             ...data.players[uid],
@@ -326,9 +368,9 @@ export async function makeMove(
         updatedPlayers[playerUid].isCurrentPlayer = playerUid === nextPlayer;
     });
 
-    // Random number for next player
-    const nextNumber = Math.floor(Math.random() * 9) + 1;
-      const ttlDate = new Date(Date.now() + 2 * 60 * 60 * 1000);
+        // Random number for next player
+        const nextNumber = Math.floor(Math.random() * 9) + 1;
+        const ttlDate = new Date(Date.now() + 2 * 60 * 60 * 1000);
     // Record move in subcollection
     const moveRef = doc(collection(db, 'rooms', roomCode, 'moves'));
     batch.set(moveRef, {
@@ -355,6 +397,24 @@ export async function makeMove(
         },
         updatedAt: serverTimestamp()
     });
+
+    // If game finished (someone lost all lives), increment user stats and set ttl on room
+    const gameFinished = updatedPlayers[uid].lives <= 0;
+    if (gameFinished) {
+        // set expireAt on room
+        batch.update(roomRef, { expireAt: ttlDate });
+
+        // increment gamesPlayed for all players, and gamesWon for winner
+        for (const puid of Object.keys(updatedPlayers)) {
+            const userRef = doc(db, 'users', puid);
+            batch.set(userRef, { gamesPlayed: increment(1) }, { merge: true });
+        }
+        const winnerUid = nextPlayer;
+        if (winnerUid) {
+            const winnerRef = doc(db, 'users', winnerUid);
+            batch.set(winnerRef, { gamesWon: increment(1) }, { merge: true });
+        }
+    }
 
     await batch.commit();
     return isCorrect;

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { signUp, signIn } from '$lib/firebase';
+    import { signUp, signIn, signOut } from '$lib/firebase';
     import { goto } from '$app/navigation';
     import { COLORS } from '$lib/config';
 
@@ -21,7 +21,14 @@
         error = '';
 
         try {
-            await signIn(email, password);
+            const u = await signIn(email, password);
+            // require email to be verified
+            if (u && !u.emailVerified) {
+                // sign out and show message
+                await signOut();
+                error = 'Please verify your email before signing in. Check your inbox for the verification link.';
+                return;
+            }
             goto('/');
         } catch (err: any) {
             console.error(err);
@@ -52,7 +59,9 @@
 
         try {
             await signUp(email, password, nickname);
-            goto('/');
+            // inform user to verify email
+            error = 'Verification email sent. Please check your inbox and verify your email before signing in.';
+            mode = 'signin';
         } catch (err: any) {
             console.error(err);
             error = err.message || 'Failed to sign up';
@@ -177,7 +186,7 @@
         </button>
 
         <!-- Toggle Mode -->
-        <!-- <button
+        <button
             type="button"
             on:click={toggleMode}
             class="w-full text-center text-xs sm:text-sm underline"
@@ -185,7 +194,7 @@
             disabled={loading}
         >
             {mode === 'signin' ? "Don't have an account? Sign Up" : 'Already have an account? Sign In'}
-        </button> -->
+        </button>
 
         <!-- Error Message -->
         {#if error}

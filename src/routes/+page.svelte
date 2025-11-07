@@ -25,9 +25,24 @@
 			authLoading = false;
 
 			if (authUser) {
-				userProfile = await getUserProfile(authUser.uid);
+				// enforce email verification
+				if (!authUser.emailVerified) {
+					await signOut();
+					goto('/auth');
+					return;
+				}
+
+				// Try to get user profile with retries
+				let retries = 3;
+				while (retries > 0) {
+					userProfile = await getUserProfile(authUser.uid);
+					if (userProfile) break;
+					await new Promise(resolve => setTimeout(resolve, 500));
+					retries--;
+				}
+
 				if (!userProfile) {
-					// User doesn't have a profile, sign them out
+					// User doesn't have a profile after retries, sign them out
 					await signOut();
 					goto('/auth');
 				}

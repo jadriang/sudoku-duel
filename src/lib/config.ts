@@ -6,5 +6,5 @@ export const COLORS = {
 export const GAME_CONFIG = {
     maxLives: 5,
     minPlayers: 2,
-    maxPlayers: 3
+    maxPlayers: 5
 };

@@ -27,6 +27,12 @@
         const unsubAuth = onAuthChange(async (authUser) => {
             user = authUser;
             if (authUser) {
+                // require email verified
+                if (!authUser.emailVerified) {
+                    goto('/auth');
+                    return;
+                }
+
                 userProfile = await getUserProfile(authUser.uid);
                 if (!userProfile) {
                     goto('/auth');
@@ -140,8 +146,21 @@
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
             <div class="w-full sm:w-auto">
                 <h1 class="retro-text text-base sm:text-xl mb-2" style="color: {COLORS.primary}">🎮 LOBBY</h1>
-                <div class="retro-box px-3 py-2 inline-block" style="background-color: {COLORS.primary}; color: {COLORS.secondary}">
+                <div class="retro-box px-3 py-2 inline-flex items-center gap-2" style="background-color: {COLORS.primary}; color: {COLORS.secondary}">
                     <p class="retro-text text-[10px] sm:text-xs break-all">CODE: {data.code}</p>
+                    <!-- inline this button to the code -->
+                    <button
+                        type="button"
+                        on:click={() => {
+                            navigator.clipboard.writeText(data.code);
+                        }}
+                        class="retro-button px-2 py-1 hover:opacity-90"
+                        style="background-color: {COLORS.secondary}; color: {COLORS.primary}"
+                    >
+                        <span class="text-[8px] sm:text-[10px]">
+                            📋
+                        </span>
+                    </button>
                 </div>
             </div>
             <button
