@@ -95,6 +95,7 @@
                     status: 'finished'
                 },
                 status: 'finished',
+                expireAt: ttlDate,
                 updatedAt: serverTimestamp()
             });
 
@@ -158,6 +159,20 @@
             status: gameStatus,
             updatedAt: serverTimestamp()
         });
+
+        if (gameStatus === 'finished') {
+            batch.update(roomRef, { expireAt: ttlDate });
+            
+            for (const puid of playerUids) {
+                const userRef = doc(db, 'users', puid);
+                batch.set(userRef, { gamesPlayed: increment(1) }, { merge: true });
+            }
+            const winnerUid = nextPlayer;
+            if (winnerUid) {
+                const winnerRef = doc(db, 'users', winnerUid);
+                batch.set(winnerRef, { gamesWon: increment(1) }, { merge: true });
+            }
+        }
 
         await batch.commit();
         return isCorrect;
