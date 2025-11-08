@@ -149,6 +149,13 @@
 				<span class="text-[10px] sm:text-xs">📖 HOW TO PLAY</span>
 			</a>
 
+			<a
+				href={resolve('/leaderboard')}
+				class="retro-button mb-4 block bg-yellow-600 py-3 text-center text-white hover:opacity-90 sm:py-4"
+			>
+				<span class="text-[10px] sm:text-xs">🏆 LEADERBOARD</span>
+			</a>
+
 			<div class="mb-4 grid grid-cols-2 gap-3">
 				<button
 					type="button"

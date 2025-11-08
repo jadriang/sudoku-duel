@@ -9,10 +9,11 @@ import {
 	collection,
 	query,
 	where,
+	orderBy,
+	limit,
 	increment,
 	writeBatch,
 	addDoc,
-	setDoc,
 	type Timestamp,
 	type FieldValue
 } from 'firebase/firestore';
@@ -94,16 +95,92 @@ export const auth = getAuth(app);
 // AUTH FUNCTIONS
 // ====================================
 
+// Helper function to check if nickname is available
+export async function isNicknameAvailable(nickname: string): Promise<boolean> {
+	const nicknameDoc = doc(db, 'usernames', nickname.toLowerCase());
+	const snap = await getDoc(nicknameDoc);
+	return !snap.exists();
+}
+
+// Generate a random unique username
+export async function generateRandomUsername(): Promise<string> {
+	const adjectives = [
+		'Swift',
+		'Clever',
+		'Bright',
+		'Quick',
+		'Smart',
+		'Sharp',
+		'Wise',
+		'Bold',
+		'Brave',
+		'Cool',
+		'Epic',
+		'Fast',
+		'Strong',
+		'Lucky',
+		'Magic',
+		'Super'
+	];
+	const nouns = [
+		'Panda',
+		'Tiger',
+		'Eagle',
+		'Dragon',
+		'Phoenix',
+		'Wolf',
+		'Falcon',
+		'Lion',
+		'Bear',
+		'Fox',
+		'Hawk',
+		'Ninja',
+		'Wizard',
+		'Knight',
+		'Samurai',
+		'Warrior'
+	];
+
+	let attempts = 0;
+	const maxAttempts = 50;
+
+	while (attempts < maxAttempts) {
+		const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+		const noun = nouns[Math.floor(Math.random() * nouns.length)];
+		const number = Math.floor(Math.random() * 1000);
+		const username = `${adjective}${noun}${number}`;
+
+		if (await isNicknameAvailable(username)) {
+			return username;
+		}
+		attempts++;
+	}
+
+	// Fallback to timestamp-based username
+	return `Player${Date.now()}`;
+}
+
 export async function signUp(email: string, password: string, nickname: string): Promise<User> {
 	if (!email?.trim() || !password?.trim() || !nickname?.trim()) {
 		throw new Error('Email, password, and nickname are required');
 	}
 
+	// Check if nickname is already taken
+	const nicknameLower = nickname.trim().toLowerCase();
+	const isAvailable = await isNicknameAvailable(nicknameLower);
+	if (!isAvailable) {
+		throw new Error('This username is already taken. Please choose another one.');
+	}
+
 	const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 	const user = userCredential.user;
 
+	// Use a batch to ensure atomicity
+	const batch = writeBatch(db);
+
+	// Create user profile
 	const userDoc = doc(db, 'users', user.uid);
-	await setDoc(userDoc, {
+	batch.set(userDoc, {
 		uid: user.uid,
 		email: user.email,
 		nickname: nickname.trim(),
@@ -111,6 +188,16 @@ export async function signUp(email: string, password: string, nickname: string):
 		gamesPlayed: 0,
 		gamesWon: 0
 	} as UserProfile);
+
+	// Reserve the nickname
+	const nicknameDoc = doc(db, 'usernames', nicknameLower);
+	batch.set(nicknameDoc, {
+		uid: user.uid,
+		nickname: nickname.trim(),
+		createdAt: serverTimestamp()
+	});
+
+	await batch.commit();
 
 	try {
 		await sendEmailVerification(user);
@@ -149,6 +236,19 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 
 export function onAuthChange(callback: (user: User | null) => void) {
 	return onAuthStateChanged(auth, callback);
+}
+
+// Get top players for leaderboard
+export async function getLeaderboard(limitCount: number = 10): Promise<UserProfile[]> {
+	const usersCol = collection(db, 'users');
+	const q = query(
+		usersCol,
+		where('gamesWon', '>', 0),
+		orderBy('gamesWon', 'desc'),
+		limit(limitCount)
+	);
+	const snapshot = await getDocs(q);
+	return snapshot.docs.map((doc) => doc.data() as UserProfile);
 }
 
 // ====================================

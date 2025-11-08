@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { signUp, signIn, signOut } from '$lib/firebase';
+	import { signUp, signIn, signOut, generateRandomUsername } from '$lib/firebase';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { COLORS } from '$lib/config';
@@ -10,6 +10,7 @@
 	let confirmPassword = '';
 	let nickname = '';
 	let loading = false;
+	let generatingUsername = false;
 	let error = '';
 
 	async function handleSignIn() {
@@ -79,6 +80,19 @@
 		password = '';
 		confirmPassword = '';
 	}
+
+	async function handleGenerateUsername() {
+		generatingUsername = true;
+		error = '';
+		try {
+			nickname = await generateRandomUsername();
+		} catch (err) {
+			console.error(err);
+			error = 'Failed to generate username';
+		} finally {
+			generatingUsername = false;
+		}
+	}
 </script>
 
 <div
@@ -129,16 +143,28 @@
 		<!-- Nickname (Sign Up Only) -->
 		{#if mode === 'signup'}
 			<label class="retro-text mb-2 block text-[10px] sm:text-xs" style="color: {COLORS.primary}"
-				>NICKNAME:</label
+				>USERNAME:</label
 			>
-			<input
-				type="text"
-				bind:value={nickname}
-				class="retro-box mb-4 w-full bg-white px-3 py-2 text-center font-mono text-sm uppercase focus:ring-4 focus:outline-none sm:py-3 sm:text-base"
-				style="focus:ring-color: {COLORS.primary}"
-				placeholder="PLAYER NAME"
-				maxlength="20"
-			/>
+			<div class="mb-4 flex gap-2">
+				<input
+					type="text"
+					bind:value={nickname}
+					class="retro-box flex-1 bg-white px-3 py-2 text-center font-mono text-sm focus:ring-4 focus:outline-none sm:py-3 sm:text-base"
+					style="focus:ring-color: {COLORS.primary}"
+					placeholder="PLAYER NAME"
+					maxlength="20"
+				/>
+				<button
+					type="button"
+					on:click={handleGenerateUsername}
+					class="retro-button px-3 py-2 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-3"
+					style="background-color: #10b981; color: white"
+					disabled={generatingUsername || loading}
+					title="Generate random username"
+				>
+					<span class="text-[10px] sm:text-xs">{generatingUsername ? '⏳' : '🎲'}</span>
+				</button>
+			</div>
 		{/if}
 
 		<!-- Password Input -->
