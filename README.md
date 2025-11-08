@@ -45,22 +45,26 @@ A real-time multiplayer Sudoku battle game built with SvelteKit and Firebase.
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/jadriang/sudoku-duel.git
 cd sudoku-duel
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Create a `.env` file with your Firebase configuration:
+
 ```bash
 cp .env.example .env
 ```
 
 4. Add your Firebase configuration to `.env`:
+
 ```
 PUBLIC_FIREBASE_API_KEY=your_api_key_here
 PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
@@ -71,6 +75,7 @@ PUBLIC_FIREBASE_APP_ID=1:123456789:web:abc123
 ```
 
 5. Run the development server:
+
 ```bash
 npm run dev
 ```
@@ -82,6 +87,7 @@ The app will be available at `http://localhost:5173`
 ### 1. Authentication
 
 Enable Email/Password authentication:
+
 1. Go to Firebase Console > Authentication > Sign-in method
 2. Enable Email/Password provider
 3. (Optional) Enable email verification in Authentication settings
@@ -97,6 +103,7 @@ firebase deploy --only firestore:rules
 Or manually copy the rules from `firestore.rules` to Firebase Console > Firestore Database > Rules.
 
 **Key security features:**
+
 - Email verification required for all game actions
 - Users can only modify their own profiles
 - Players can only update rooms they're part of
@@ -191,40 +198,45 @@ Edit `src/lib/config.ts` to customize game settings:
 
 ```typescript
 export const GAME_CONFIG = {
-    maxLives: 5,        // Lives per player
-    minPlayers: 2,      // Minimum players to start
-    maxPlayers: 5       // Maximum players per game
+	maxLives: 5, // Lives per player
+	minPlayers: 2, // Minimum players to start
+	maxPlayers: 5 // Maximum players per game
 };
 
 export const COLORS = {
-    primary: '#3B7A57',    // Deep green
-    secondary: '#FFD447'   // Yellow/gold
+	primary: '#3B7A57', // Deep green
+	secondary: '#FFD447' // Yellow/gold
 };
 ```
 
 ## Development
 
 ### Run Development Server
+
 ```bash
 npm run dev
 ```
 
 ### Build for Production
+
 ```bash
 npm run build
 ```
 
 ### Preview Production Build
+
 ```bash
 npm run preview
 ```
 
 ### Type Checking
+
 ```bash
 npm run check
 ```
 
 ### Linting
+
 ```bash
 npm run lint
 ```
@@ -298,5 +310,6 @@ Contributions welcome! Please open an issue or submit a pull request.
 ## Support
 
 For issues and questions:
+
 - Open a GitHub issue
 - Check existing issues for solutions

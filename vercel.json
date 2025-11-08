@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build",
-  "framework": "sveltekit",
-  "regions": ["iad1"]
+	"buildCommand": "npm run build",
+	"framework": "sveltekit",
+	"regions": ["iad1"]
 }
