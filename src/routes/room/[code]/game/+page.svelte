@@ -33,6 +33,11 @@
 		game?: GameState;
 		host?: string;
 		status?: 'waiting' | 'active' | 'finished';
+		settings?: {
+			difficulty?: 'easy' | 'medium' | 'hard' | 'expert';
+			timeLimit?: number | null;
+			privateGame?: boolean;
+		};
 	} | null = null;
 	let moves: Move[] = [];
 	let unsub: Array<() => void> = [];
@@ -383,9 +388,21 @@
 		>
 			<!-- Header -->
 			<div class="mb-4 flex items-center justify-between sm:mb-6">
-				<h2 class="retro-text text-[10px] sm:text-sm md:text-lg" style="color: {COLORS.primary}">
-					🎮 GAME
-				</h2>
+				<div>
+					<h2 class="retro-text text-[10px] sm:text-sm md:text-lg" style="color: {COLORS.primary}">
+						🎮 GAME
+					</h2>
+					{#if room?.settings?.difficulty}
+						<div class="mt-1">
+							<span
+								class="retro-box inline-block px-2 py-1 text-[8px] uppercase sm:text-[10px]"
+								style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
+							>
+								🎯 {room.settings.difficulty}
+							</span>
+						</div>
+					{/if}
+				</div>
 				<button
 					on:click={goBack}
 					class="retro-button px-2 py-1 hover:opacity-90 sm:px-3 sm:py-2"

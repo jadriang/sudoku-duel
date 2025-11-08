@@ -29,6 +29,11 @@
 		game?: {
 			started?: boolean;
 		};
+		settings?: {
+			difficulty?: 'easy' | 'medium' | 'hard' | 'expert';
+			timeLimit?: number | null;
+			privateGame?: boolean;
+		};
 	} | null = null;
 
 	let loading = true;
@@ -158,22 +163,34 @@
 					<h1 class="retro-text mb-2 text-base sm:text-xl" style="color: {COLORS.primary}">
 						🎮 LOBBY
 					</h1>
-					<div
-						class="retro-box inline-flex items-center gap-2 px-3 py-2"
-						style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
-					>
-						<p class="retro-text text-[10px] break-all sm:text-xs">CODE: {data.code}</p>
-						<!-- inline this button to the code -->
-						<button
-							type="button"
-							on:click={() => {
-								navigator.clipboard.writeText(data.code);
-							}}
-							class="retro-button px-2 py-1 hover:opacity-90"
-							style="background-color: {COLORS.secondary}; color: {COLORS.primary}"
+					<div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+						<div
+							class="retro-box inline-flex items-center gap-2 px-3 py-2"
+							style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
 						>
-							<span class="text-[8px] sm:text-[10px]"> 📋 </span>
-						</button>
+							<p class="retro-text text-[10px] break-all sm:text-xs">CODE: {data.code}</p>
+							<!-- inline this button to the code -->
+							<button
+								type="button"
+								on:click={() => {
+									navigator.clipboard.writeText(data.code);
+								}}
+								class="retro-button px-2 py-1 hover:opacity-90"
+								style="background-color: {COLORS.secondary}; color: {COLORS.primary}"
+							>
+								<span class="text-[8px] sm:text-[10px]"> 📋 </span>
+							</button>
+						</div>
+						{#if room?.settings?.difficulty}
+							<div
+								class="retro-box inline-flex items-center px-3 py-2"
+								style="background-color: {COLORS.secondary}; color: {COLORS.primary}"
+							>
+								<p class="retro-text text-[10px] uppercase sm:text-xs">
+									🎯 {room.settings.difficulty}
+								</p>
+							</div>
+						{/if}
 					</div>
 				</div>
 				<button

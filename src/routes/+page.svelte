@@ -18,6 +18,7 @@
 	let authLoading = true; // Add auth loading state
 	let error = '';
 	let mode: 'create' | 'join' | null = null;
+	let difficulty: 'easy' | 'medium' | 'hard' | 'expert' = 'easy';
 	let unsubAuth: (() => void) | null = null;
 
 	onMount(() => {
@@ -56,26 +57,26 @@
 		if (unsubAuth) unsubAuth();
 	});
 
-	const createRoom = async () => {
+	async function createRoom() {
 		if (!userProfile) {
-			error = 'User profile not loaded';
+			error = 'You must be logged in to create a room.';
 			return;
 		}
-
 		loading = true;
 		error = '';
-
 		try {
-			const roomId = await createRoomInFirestore(userProfile.uid, userProfile.nickname);
-			await goto(resolve(`/room/${roomId}`));
-		} catch (err) {
-			console.error(err);
-			error = (err as Error)?.message ?? 'Failed to create room.';
+			const code = await createRoomInFirestore(userProfile.uid, userProfile.nickname, difficulty);
+			await goto(resolve(`/room/${code}`));
+		} catch (err: unknown) {
+			if (err instanceof Error) {
+				error = err.message;
+			} else {
+				error = 'Failed to create room. Please try again.';
+			}
 		} finally {
 			loading = false;
 		}
-	};
-
+	}
 	const joinRoom = async () => {
 		if (!roomCode.trim() || !userProfile) {
 			error = 'Please enter a room code.';
@@ -205,6 +206,55 @@
 					<p class="retro-text mb-4 text-xs sm:text-sm" style="color: {COLORS.primary}">
 						CREATE ROOM?
 					</p>
+				</div>
+
+				<div class="mb-4">
+					<label
+						class="retro-text mb-2 block text-[10px] sm:text-xs"
+						style="color: {COLORS.primary}">DIFFICULTY:</label
+					>
+					<div class="grid grid-cols-2 gap-2">
+						<button
+							type="button"
+							on:click={() => (difficulty = 'easy')}
+							class="retro-button py-2 text-[10px] hover:opacity-90 sm:text-xs"
+							style="background-color: {difficulty === 'easy'
+								? COLORS.primary
+								: '#4b5563'}; color: {difficulty === 'easy' ? COLORS.secondary : '#ffffff'}"
+						>
+							EASY
+						</button>
+						<button
+							type="button"
+							on:click={() => (difficulty = 'medium')}
+							class="retro-button py-2 text-[10px] hover:opacity-90 sm:text-xs"
+							style="background-color: {difficulty === 'medium'
+								? COLORS.primary
+								: '#4b5563'}; color: {difficulty === 'medium' ? COLORS.secondary : '#ffffff'}"
+						>
+							MEDIUM
+						</button>
+						<button
+							type="button"
+							on:click={() => (difficulty = 'hard')}
+							class="retro-button py-2 text-[10px] hover:opacity-90 sm:text-xs"
+							style="background-color: {difficulty === 'hard'
+								? COLORS.primary
+								: '#4b5563'}; color: {difficulty === 'hard' ? COLORS.secondary : '#ffffff'}"
+						>
+							HARD
+						</button>
+						<button
+							type="button"
+							on:click={() => (difficulty = 'expert')}
+							class="retro-button py-2 text-[10px] hover:opacity-90 sm:text-xs"
+							style="background-color: {difficulty === 'expert'
+								? COLORS.primary
+								: '#4b5563'}; color: {difficulty === 'expert' ? COLORS.secondary : '#ffffff'}"
+						>
+							EXPERT
+						</button>
+					</div>
 				</div>
 
 				<div class="grid grid-cols-2 gap-3">

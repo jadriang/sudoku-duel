@@ -257,7 +257,8 @@ export async function getLeaderboard(limitCount: number = 10): Promise<UserProfi
 
 export async function createRoomInFirestore(
 	hostUid: string,
-	hostNickname: string
+	hostNickname: string,
+	difficulty: Difficulty = 'easy'
 ): Promise<string> {
 	if (!hostUid?.trim() || !hostNickname?.trim()) throw new Error('Invalid host data');
 
@@ -304,7 +305,7 @@ export async function createRoomInFirestore(
 			}
 		},
 		settings: {
-			difficulty: 'easy' as Difficulty,
+			difficulty: difficulty as Difficulty,
 			timeLimit: null,
 			privateGame: false
 		}
@@ -357,10 +358,7 @@ export async function joinRoomInFirestore(
 	return roomCode;
 }
 
-export async function startGameInFirestore(
-	roomCode: string,
-	difficulty: Difficulty = 'easy'
-): Promise<void> {
+export async function startGameInFirestore(roomCode: string): Promise<void> {
 	if (!roomCode?.trim()) throw new Error('Invalid room code');
 
 	const roomRef = doc(db, 'rooms', roomCode);
@@ -370,6 +368,7 @@ export async function startGameInFirestore(
 	const data = snap.data();
 	if (data?.game?.started) throw new Error('Game already started');
 
+	const difficulty = (data.settings?.difficulty as Difficulty) || 'easy';
 	const s = getSudoku(difficulty);
 	const puzzleStr = s.puzzle.replace(/-/g, '.');
 	const solutionStr = s.solution;
