@@ -37,6 +37,7 @@
 	let moves: Move[] = [];
 	let unsub: Array<() => void> = [];
 	let loading = true;
+	let authLoading = true;
 	let error = '';
 	let lastMoveResult: boolean | null = null;
 	let flashingCell: number | null = null;
@@ -213,6 +214,7 @@
 					await goto(resolve('/auth'));
 					return;
 				}
+				authLoading = false;
 			} else {
 				await goto(resolve('/auth'));
 				return;
@@ -361,141 +363,158 @@
 	class="flex min-h-screen items-center justify-center p-2 sm:p-4"
 	style="background-color: {COLORS.primary}"
 >
-	<div
-		class="retro-box w-full max-w-[98vw] p-3 sm:p-6"
-		style="background-color: {COLORS.secondary}"
-	>
-		<!-- Header -->
-		<div class="mb-4 flex items-center justify-between sm:mb-6">
-			<h2 class="retro-text text-[10px] sm:text-sm md:text-lg" style="color: {COLORS.primary}">
-				🎮 GAME
-			</h2>
-			<button
-				on:click={goBack}
-				class="retro-button px-2 py-1 hover:opacity-90 sm:px-3 sm:py-2"
-				style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
+	{#if authLoading}
+		<!-- Loading state while checking authentication -->
+		<div class="text-center">
+			<h1
+				class="retro-text mb-4 animate-pulse text-2xl sm:text-4xl md:text-5xl"
+				style="color: {COLORS.secondary}"
 			>
-				<span class="text-[10px] sm:text-xs">❌</span>
-			</button>
+				🎮 SUDOKU DUEL
+			</h1>
+			<p class="retro-text animate-pulse text-xs sm:text-sm" style="color: {COLORS.secondary}">
+				LOADING...
+			</p>
 		</div>
+	{:else}
+		<div
+			class="retro-box w-full max-w-[98vw] p-3 sm:p-6"
+			style="background-color: {COLORS.secondary}"
+		>
+			<!-- Header -->
+			<div class="mb-4 flex items-center justify-between sm:mb-6">
+				<h2 class="retro-text text-[10px] sm:text-sm md:text-lg" style="color: {COLORS.primary}">
+					🎮 GAME
+				</h2>
+				<button
+					on:click={goBack}
+					class="retro-button px-2 py-1 hover:opacity-90 sm:px-3 sm:py-2"
+					style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
+				>
+					<span class="text-[10px] sm:text-xs">❌</span>
+				</button>
+			</div>
 
-		{#if loading}
-			<div class="py-12 text-center">
-				<p class="retro-text animate-pulse text-xs sm:text-sm" style="color: {COLORS.primary}">
-					LOADING...
-				</p>
-			</div>
-		{:else if error}
-			<div
-				class="retro-box p-3 text-center sm:p-4"
-				style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
-			>
-				<p class="retro-text text-[10px] sm:text-xs">⚠️ {error}</p>
-			</div>
-		{:else if room?.game?.started}
-			<div class="flex flex-col gap-3 sm:gap-4 lg:grid lg:grid-cols-4">
-				<!-- Top/Left: Status (Mobile First) -->
-				<div class="space-y-3 sm:space-y-4 lg:col-span-1">
-					<!-- Current Number or Game Over -->
-					<div class="retro-box bg-white p-3 text-center sm:p-4">
-						{#if gameOver}
-							<div class="space-y-2">
-								<div class="animate-bounce text-3xl sm:text-4xl">🏆</div>
-								<p class="retro-text text-[10px] sm:text-xs" style="color: {COLORS.primary}">
-									WINNER:
+			{#if loading}
+				<div class="py-12 text-center">
+					<p class="retro-text animate-pulse text-xs sm:text-sm" style="color: {COLORS.primary}">
+						LOADING...
+					</p>
+				</div>
+			{:else if error}
+				<div
+					class="retro-box p-3 text-center sm:p-4"
+					style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
+				>
+					<p class="retro-text text-[10px] sm:text-xs">⚠️ {error}</p>
+				</div>
+			{:else if room?.game?.started}
+				<div class="flex flex-col gap-3 sm:gap-4 lg:grid lg:grid-cols-4">
+					<!-- Top/Left: Status (Mobile First) -->
+					<div class="space-y-3 sm:space-y-4 lg:col-span-1">
+						<!-- Current Number or Game Over -->
+						<div class="retro-box bg-white p-3 text-center sm:p-4">
+							{#if gameOver}
+								<div class="space-y-2">
+									<div class="animate-bounce text-3xl sm:text-4xl">🏆</div>
+									<p class="retro-text text-[10px] sm:text-xs" style="color: {COLORS.primary}">
+										WINNER:
+									</p>
+									<p
+										class="retro-text text-xs break-all sm:text-sm"
+										style="color: {COLORS.primary}"
+									>
+										{winner}
+									</p>
+									<button
+										on:click={goBack}
+										class="retro-button mt-2 w-full px-3 py-2 hover:opacity-90"
+										style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
+									>
+										<span class="text-[10px] sm:text-xs">LOBBY</span>
+									</button>
+								</div>
+							{:else}
+								<p class="retro-text mb-2 text-[10px] sm:text-xs" style="color: {COLORS.primary}">
+									NUMBER:
 								</p>
-								<p class="retro-text text-xs break-all sm:text-sm" style="color: {COLORS.primary}">
-									{winner}
+								<p class="retro-text text-4xl sm:text-5xl" style="color: {COLORS.primary}">
+									{currentNumber}
 								</p>
-								<button
-									on:click={goBack}
-									class="retro-button mt-2 w-full px-3 py-2 hover:opacity-90"
-									style="background-color: {COLORS.primary}; color: {COLORS.secondary}"
-								>
-									<span class="text-[10px] sm:text-xs">LOBBY</span>
-								</button>
-							</div>
-						{:else}
-							<p class="retro-text mb-2 text-[10px] sm:text-xs" style="color: {COLORS.primary}">
-								NUMBER:
-							</p>
-							<p class="retro-text text-4xl sm:text-5xl" style="color: {COLORS.primary}">
-								{currentNumber}
-							</p>
-							{#if isMyTurn}
-								<p
-									class="retro-text mt-2 animate-pulse text-[10px] sm:text-xs"
-									style="color: {COLORS.primary}"
-								>
-									YOUR TURN!
-								</p>
+								{#if isMyTurn}
+									<p
+										class="retro-text mt-2 animate-pulse text-[10px] sm:text-xs"
+										style="color: {COLORS.primary}"
+									>
+										YOUR TURN!
+									</p>
+								{/if}
 							{/if}
+						</div>
+
+						<!-- Players -->
+						<div class="retro-box bg-white p-3 sm:p-4">
+							<h3
+								class="retro-text mb-2 text-[10px] sm:mb-3 sm:text-xs"
+								style="color: {COLORS.primary}"
+							>
+								👥 PLAYERS
+							</h3>
+							<div class="space-y-2">
+								{#each playersList as player (player.nickname)}
+									<div
+										class="retro-box p-2"
+										style="background-color: {COLORS.secondary}; {player.isCurrentPlayer
+											? `ring-2 sm:ring-4; ring-color: ${COLORS.primary}`
+											: ''}"
+									>
+										<div class="mb-1 flex items-center justify-between">
+											<span
+												class="retro-text text-[8px] break-all sm:text-[10px]"
+												style="color: {COLORS.primary}"
+											>
+												{player.nickname}
+											</span>
+										</div>
+										<div class="flex gap-1">
+											{#each Array.from({ length: GAME_CONFIG.maxLives }, (_, i) => i) as i (i)}
+												<span class="text-sm sm:text-lg">
+													{i < player.lives ? '❤️' : '🖤'}
+												</span>
+											{/each}
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+
+						<!-- Move Feedback -->
+						{#if lastMoveResult !== null}
+							<div
+								class="retro-box shake p-2 text-center sm:p-3"
+								style="background-color: {COLORS.primary}"
+							>
+								<p class="retro-text text-[10px] sm:text-xs" style="color: {COLORS.secondary}">
+									{lastMoveResult ? '✓ CORRECT!' : `✗ WRONG! ${myLives}♥`}
+								</p>
+							</div>
 						{/if}
 					</div>
 
-					<!-- Players -->
-					<div class="retro-box bg-white p-3 sm:p-4">
-						<h3
-							class="retro-text mb-2 text-[10px] sm:mb-3 sm:text-xs"
-							style="color: {COLORS.primary}"
-						>
-							👥 PLAYERS
-						</h3>
-						<div class="space-y-2">
-							{#each playersList as player (player.nickname)}
-								<div
-									class="retro-box p-2"
-									style="background-color: {COLORS.secondary}; {player.isCurrentPlayer
-										? `ring-2 sm:ring-4; ring-color: ${COLORS.primary}`
-										: ''}"
-								>
-									<div class="mb-1 flex items-center justify-between">
-										<span
-											class="retro-text text-[8px] break-all sm:text-[10px]"
-											style="color: {COLORS.primary}"
-										>
-											{player.nickname}
-										</span>
-									</div>
-									<div class="flex gap-1">
-										{#each Array.from({ length: GAME_CONFIG.maxLives }, (_, i) => i) as i (i)}
-											<span class="text-sm sm:text-lg">
-												{i < player.lives ? '❤️' : '🖤'}
-											</span>
-										{/each}
-									</div>
-								</div>
-							{/each}
-						</div>
-					</div>
-
-					<!-- Move Feedback -->
-					{#if lastMoveResult !== null}
-						<div
-							class="retro-box shake p-2 text-center sm:p-3"
-							style="background-color: {COLORS.primary}"
-						>
-							<p class="retro-text text-[10px] sm:text-xs" style="color: {COLORS.secondary}">
-								{lastMoveResult ? '✓ CORRECT!' : `✗ WRONG! ${myLives}♥`}
-							</p>
-						</div>
-					{/if}
-				</div>
-
-				<!-- Center: Game Board -->
-				<div class="order-first flex items-center justify-center lg:order-none lg:col-span-2">
-					<div class="retro-box inline-block bg-white p-1 sm:p-2">
-						<div class="grid grid-cols-9 gap-0">
-							{#each Array.from({ length: 9 }, (_, r) => r) as r (r)}
-								{#each Array.from({ length: 9 }, (_, c) => c) as c (`${r}-${c}`)}
-									{@const position = r * 9 + c}
-									{@const value = room.game.board[position]}
-									{@const isPuzzleNumber = room.game.puzzle[position] !== '.'}
-									{@const isFlashing = flashingCell === position}
-									<!-- svelte-ignore a11y-click-events-have-key-events -->
-									<!-- svelte-ignore a11y-no-static-element-interactions -->
-									<div
-										class={`
+					<!-- Center: Game Board -->
+					<div class="order-first flex items-center justify-center lg:order-none lg:col-span-2">
+						<div class="retro-box inline-block bg-white p-1 sm:p-2">
+							<div class="grid grid-cols-9 gap-0">
+								{#each Array.from({ length: 9 }, (_, r) => r) as r (r)}
+									{#each Array.from({ length: 9 }, (_, c) => c) as c (`${r}-${c}`)}
+										{@const position = r * 9 + c}
+										{@const value = room.game.board[position]}
+										{@const isPuzzleNumber = room.game.puzzle[position] !== '.'}
+										{@const isFlashing = flashingCell === position}
+										<!-- svelte-ignore a11y-click-events-have-key-events -->
+										<!-- svelte-ignore a11y-no-static-element-interactions -->
+										<div
+											class={`
                                             flex h-9 w-9 items-center justify-center sm:h-11 sm:w-11 md:h-14 md:w-14
                                             ${borderClasses(r, c)}
                                             ${isPuzzleNumber ? '' : 'bg-white'}
@@ -503,68 +522,71 @@
                                             ${isFlashing && lastMoveResult !== null ? (lastMoveResult ? 'flash-correct' : 'flash-incorrect') : ''}
                                             transition-colors
                                         `}
-										style="background-color: {isPuzzleNumber
-											? COLORS.secondary
-											: 'white'}; {isMyTurn && !isPuzzleNumber && !gameOver
-											? `hover:background-color: ${COLORS.secondary}`
-											: ''}"
-										on:click={() => !isPuzzleNumber && !gameOver && handleCellClick(position)}
-									>
-										<span
-											class="retro-text board-number text-sm sm:text-base md:text-xl"
-											style="color: {COLORS.primary}"
+											style="background-color: {isPuzzleNumber
+												? COLORS.secondary
+												: 'white'}; {isMyTurn && !isPuzzleNumber && !gameOver
+												? `hover:background-color: ${COLORS.secondary}`
+												: ''}"
+											on:click={() => !isPuzzleNumber && !gameOver && handleCellClick(position)}
 										>
-											<!-- {value !== '.' ? value : ''} -->
-											{tempNumbers[position] ?? (value !== '.' ? value : '')}
-										</span>
+											<span
+												class="retro-text board-number text-sm sm:text-base md:text-xl"
+												style="color: {COLORS.primary}"
+											>
+												<!-- {value !== '.' ? value : ''} -->
+												{tempNumbers[position] ?? (value !== '.' ? value : '')}
+											</span>
+										</div>
+									{/each}
+								{/each}
+							</div>
+						</div>
+					</div>
+
+					<!-- Right/Bottom: Move History -->
+					<div class="retro-box bg-white p-3 sm:p-4 lg:col-span-1">
+						<h3
+							class="retro-text mb-2 text-[10px] sm:mb-3 sm:text-xs"
+							style="color: {COLORS.primary}"
+						>
+							📜 MOVES
+						</h3>
+						<div class="max-h-48 space-y-2 overflow-y-auto sm:max-h-64 lg:max-h-96">
+							{#if moves.length === 0}
+								<p class="retro-text py-4 text-center text-[8px] text-gray-500 sm:text-[10px]">
+									NO MOVES
+								</p>
+							{:else}
+								{#each moves as move (move.moveNumber)}
+									<div class="retro-box p-2 text-xs" style="background-color: {COLORS.secondary}">
+										<div class="mb-1 flex justify-between">
+											<span class="retro-text text-[8px] sm:text-[10px]">#{move.moveNumber}</span>
+											<span class="text-[8px] sm:text-[10px]"
+												>{formatTimestamp(move.timestamp)}</span
+											>
+										</div>
+										<div class="flex items-center justify-between">
+											<span class="truncate text-[8px] sm:text-[10px]">{move.player}</span>
+											<div class="flex items-center gap-1">
+												<span class="retro-text text-xs sm:text-sm" style="color: {COLORS.primary}"
+													>{move.numberPlaced}</span
+												>
+												<span class="text-sm sm:text-lg">{move.isValid ? '✓' : '✗'}</span>
+											</div>
+										</div>
 									</div>
 								{/each}
-							{/each}
+							{/if}
 						</div>
 					</div>
 				</div>
-
-				<!-- Right/Bottom: Move History -->
-				<div class="retro-box bg-white p-3 sm:p-4 lg:col-span-1">
-					<h3
-						class="retro-text mb-2 text-[10px] sm:mb-3 sm:text-xs"
-						style="color: {COLORS.primary}"
-					>
-						📜 MOVES
-					</h3>
-					<div class="max-h-48 space-y-2 overflow-y-auto sm:max-h-64 lg:max-h-96">
-						{#if moves.length === 0}
-							<p class="retro-text py-4 text-center text-[8px] text-gray-500 sm:text-[10px]">
-								NO MOVES
-							</p>
-						{:else}
-							{#each moves as move (move.moveNumber)}
-								<div class="retro-box p-2 text-xs" style="background-color: {COLORS.secondary}">
-									<div class="mb-1 flex justify-between">
-										<span class="retro-text text-[8px] sm:text-[10px]">#{move.moveNumber}</span>
-										<span class="text-[8px] sm:text-[10px]">{formatTimestamp(move.timestamp)}</span>
-									</div>
-									<div class="flex items-center justify-between">
-										<span class="truncate text-[8px] sm:text-[10px]">{move.player}</span>
-										<div class="flex items-center gap-1">
-											<span class="retro-text text-xs sm:text-sm" style="color: {COLORS.primary}"
-												>{move.numberPlaced}</span
-											>
-											<span class="text-sm sm:text-lg">{move.isValid ? '✓' : '✗'}</span>
-										</div>
-									</div>
-								</div>
-							{/each}
-						{/if}
-					</div>
+			{:else}
+				<div class="py-12 text-center">
+					<p class="retro-text text-xs sm:text-sm" style="color: {COLORS.primary}">WAITING...</p>
 				</div>
-			</div>
-		{:else}
-			<div class="py-12 text-center">
-				<p class="retro-text text-xs sm:text-sm" style="color: {COLORS.primary}">WAITING...</p>
-			</div>
-		{/if}
-	</div>
+			{/if}
+		</div>
+	{/if}
 </div>
 
 <style>
