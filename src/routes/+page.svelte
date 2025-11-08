@@ -180,6 +180,17 @@
 					</button>
 				</div>
 
+				<div class="mb-3">
+					<button
+						type="button"
+						on:click={() => goto('/how-to-play')}
+						class="retro-button w-full py-3 hover:opacity-90 sm:py-4"
+						style="background-color: #6366f1; color: white;"
+					>
+						<span class="text-[10px] sm:text-xs">📖 HOW TO PLAY</span>
+					</button>
+				</div>
+
 				<button
 					type="button"
 					on:click={handleSignOut}
