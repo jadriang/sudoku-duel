@@ -152,6 +152,12 @@
 				<p class="text-xs" style="color: {COLORS.primary}">
 					Games: {userProfile.gamesPlayed} | Won: {userProfile.gamesWon}
 				</p>
+				{#if (userProfile.winStreak ?? 0) > 0}
+					<p class="retro-text mt-1 text-[8px]" style="color: {COLORS.primary}">
+						🔥 STREAK: {userProfile.winStreak}
+						{#if (userProfile.bestWinStreak ?? 0) > 1}(BEST: {userProfile.bestWinStreak}){/if}
+					</p>
+				{/if}
 			</div>
 		{/if}
 

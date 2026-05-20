@@ -24,6 +24,9 @@
 	import { page } from '$app/stores';
 	import { writeBatch, getDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 	import { COLORS, GAME_CONFIG } from '$lib/config';
+	import { playCorrect, playIncorrect, playYourTurn, playGameOver } from '$lib/sounds';
+
+	const PLAYER_COLORS = ['#bbf7d0', '#bfdbfe', '#fef08a', '#fed7aa', '#e9d5ff'];
 
 	const code = $page.params.code;
 
@@ -49,6 +52,9 @@
 
 	let lastSeenMoveNumber = 0;
 	let tempNumbers: Record<number, string> = {};
+	// position -> nickname of the player who placed the number
+	let cellOwner: Record<number, string> = {};
+	let wasMyTurn = false;
 
 	// Helper function to get available numbers that can still be played
 	function getAvailableNumbers(board: string, solution: string): number[] {
@@ -138,11 +144,23 @@
 				expireAt: ttlDate
 			} as Move);
 
+			const winnerProfileSnap = await getDoc(doc(db, 'users', winnerUid));
+			const winnerProfile = winnerProfileSnap.data();
+			const newStreak = (winnerProfile?.winStreak ?? 0) + 1;
+			const newBest = Math.max(winnerProfile?.bestWinStreak ?? 0, newStreak);
+
 			for (const puid of playerUids) {
 				const userRef = doc(db, 'users', puid);
-				batch.set(userRef, { gamesPlayed: increment(1) }, { merge: true });
+				if (puid === winnerUid) {
+					batch.set(
+						userRef,
+						{ gamesPlayed: increment(1), gamesWon: increment(1), winStreak: newStreak, bestWinStreak: newBest },
+						{ merge: true }
+					);
+				} else {
+					batch.set(userRef, { gamesPlayed: increment(1), winStreak: 0 }, { merge: true });
+				}
 			}
-			batch.set(doc(db, 'users', winnerUid), { gamesWon: increment(1) }, { merge: true });
 
 			await batch.commit();
 			return isCorrect;
@@ -189,14 +207,23 @@
 		if (gameStatus === 'finished') {
 			batch.update(roomRef, { expireAt: ttlDate });
 
+			const winnerUid = nextPlayer;
+			const winnerProfileSnap = winnerUid ? await getDoc(doc(db, 'users', winnerUid)) : null;
+			const winnerProfile = winnerProfileSnap?.data();
+			const newStreak = (winnerProfile?.winStreak ?? 0) + 1;
+			const newBest = Math.max(winnerProfile?.bestWinStreak ?? 0, newStreak);
+
 			for (const puid of playerUids) {
 				const userRef = doc(db, 'users', puid);
-				batch.set(userRef, { gamesPlayed: increment(1) }, { merge: true });
-			}
-			const winnerUid = nextPlayer;
-			if (winnerUid) {
-				const winnerRef = doc(db, 'users', winnerUid);
-				batch.set(winnerRef, { gamesWon: increment(1) }, { merge: true });
+				if (puid === winnerUid) {
+					batch.set(
+						userRef,
+						{ gamesPlayed: increment(1), gamesWon: increment(1), winStreak: newStreak, bestWinStreak: newBest },
+						{ merge: true }
+					);
+				} else {
+					batch.set(userRef, { gamesPlayed: increment(1), winStreak: 0 }, { merge: true });
+				}
 			}
 		}
 
@@ -263,6 +290,16 @@
 			(snapshot) => {
 				moves = snapshot.docs.map((doc) => doc.data() as Move);
 
+				// Rebuild cellOwner from all valid moves
+				const newCellOwner: Record<number, string> = {};
+				for (const d of snapshot.docs) {
+					const m = d.data() as Move;
+					if (m.isValid && m.position != null) {
+						newCellOwner[m.position] = m.player;
+					}
+				}
+				cellOwner = newCellOwner;
+
 				if (snapshot.docs.length > 0) {
 					const latest = snapshot.docs[0].data() as Move;
 					const mvNumber = latest.moveNumber || 0;
@@ -276,6 +313,13 @@
 							lastMoveResult = latest.isValid ?? null;
 							if (latest.numberPlaced != null) {
 								tempNumbers[latest.position] = String(latest.numberPlaced);
+							}
+
+							// Play sound for opponent's move
+							if (latest.isValid) {
+								playCorrect();
+							} else {
+								playIncorrect();
 							}
 
 							setTimeout(() => {
@@ -330,6 +374,12 @@
 			const result = await makeMove(code as string, user.uid, position);
 			lastMoveResult = result;
 
+			if (result) {
+				playCorrect();
+			} else {
+				playIncorrect();
+			}
+
 			setTimeout(() => {
 				flashingCell = null;
 				setTimeout(() => (lastMoveResult = null), 1500);
@@ -362,6 +412,31 @@
 	$: winner = room?.game?.winner;
 	$: gameOver = room?.status === 'finished' || winner !== null;
 	$: playersList = room?.game?.players ? Object.values(room.game.players) : [];
+
+	// Assign a stable color to each player based on their order in the room
+	$: playerColorMap = (() => {
+		const map: Record<string, string> = {};
+		playersList.forEach((p, i) => {
+			map[p.nickname] = PLAYER_COLORS[i % PLAYER_COLORS.length];
+		});
+		return map;
+	})();
+
+	// Play "your turn" sound when it becomes my turn
+	$: if (isMyTurn && !wasMyTurn && !gameOver && !loading) {
+		playYourTurn();
+		wasMyTurn = true;
+	} else if (!isMyTurn) {
+		wasMyTurn = false;
+	}
+
+	// Play game-over sound once when game ends
+	let soundedGameOver = false;
+	$: if (gameOver && !soundedGameOver && user && winner != null) {
+		soundedGameOver = true;
+		const iWon = winner === (user ? room?.game?.players[user.uid]?.nickname : null);
+		playGameOver(iWon ?? false);
+	}
 </script>
 
 <div
@@ -482,16 +557,25 @@
 									<div
 										class="retro-box p-2"
 										style="background-color: {COLORS.secondary}; {player.isCurrentPlayer
-											? `ring-2 sm:ring-4; ring-color: ${COLORS.primary}`
+											? `outline: 3px solid ${COLORS.primary}`
 											: ''}"
 									>
-										<div class="mb-1 flex items-center justify-between">
-											<span
-												class="retro-text text-[8px] break-all sm:text-[10px]"
-												style="color: {COLORS.primary}"
-											>
-												{player.nickname}
-											</span>
+										<div class="mb-1 flex items-center justify-between gap-1">
+											<div class="flex items-center gap-1">
+												<span
+													class="inline-block h-3 w-3 shrink-0 rounded-sm border border-black"
+													style="background-color: {playerColorMap[player.nickname] ?? 'white'}"
+												></span>
+												<span
+													class="retro-text text-[8px] break-all sm:text-[10px]"
+													style="color: {COLORS.primary}"
+												>
+													{player.nickname}
+												</span>
+											</div>
+											{#if player.isCurrentPlayer}
+												<span class="retro-text text-[7px] shrink-0" style="color: {COLORS.primary}">▶</span>
+											{/if}
 										</div>
 										<div class="flex gap-1">
 											{#each Array.from({ length: GAME_CONFIG.maxLives }, (_, i) => i) as i (i)}
@@ -528,22 +612,23 @@
 										{@const value = room.game.board[position]}
 										{@const isPuzzleNumber = room.game.puzzle[position] !== '.'}
 										{@const isFlashing = flashingCell === position}
+										{@const owner = cellOwner[position]}
+										{@const cellBg = isPuzzleNumber
+											? COLORS.secondary
+											: owner
+												? playerColorMap[owner] ?? 'white'
+												: 'white'}
 										<!-- svelte-ignore a11y-click-events-have-key-events -->
 										<!-- svelte-ignore a11y-no-static-element-interactions -->
 										<div
 											class={`
                                             flex h-9 w-9 items-center justify-center sm:h-11 sm:w-11 md:h-14 md:w-14
                                             ${borderClasses(r, c)}
-                                            ${isPuzzleNumber ? '' : 'bg-white'}
                                             ${isMyTurn && !isPuzzleNumber && !gameOver ? 'cursor-pointer hover:opacity-50 active:opacity-75' : 'cursor-not-allowed'}
                                             ${isFlashing && lastMoveResult !== null ? (lastMoveResult ? 'flash-correct' : 'flash-incorrect') : ''}
                                             transition-colors
                                         `}
-											style="background-color: {isPuzzleNumber
-												? COLORS.secondary
-												: 'white'}; {isMyTurn && !isPuzzleNumber && !gameOver
-												? `hover:background-color: ${COLORS.secondary}`
-												: ''}"
+											style="background-color: {cellBg}"
 											on:click={() => !isPuzzleNumber && !gameOver && handleCellClick(position)}
 										>
 											<span

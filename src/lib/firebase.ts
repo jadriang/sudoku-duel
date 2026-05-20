@@ -41,6 +41,8 @@ export interface UserProfile {
 	createdAt: Timestamp | null;
 	gamesPlayed: number;
 	gamesWon: number;
+	winStreak: number;
+	bestWinStreak: number;
 }
 
 export interface Player {
@@ -186,7 +188,9 @@ export async function signUp(email: string, password: string, nickname: string):
 		nickname: nickname.trim(),
 		createdAt: serverTimestamp(),
 		gamesPlayed: 0,
-		gamesWon: 0
+		gamesWon: 0,
+		winStreak: 0,
+		bestWinStreak: 0
 	} as UserProfile);
 
 	// Reserve the nickname
